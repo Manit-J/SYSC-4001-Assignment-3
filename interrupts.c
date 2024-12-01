@@ -24,8 +24,16 @@ process* waiting = NULL; // Waiting Queue
 
 process* running = NULL; // Process currently running
 
+bool isEP = false; // true if scheduler uses EP algo, false otherwise
+bool isRR = true; // true if scheduler uses RR algo, false otherwise
+
 bool cpuBusy = false; // CPU Busy/Free state
-bool memoryAvailable = false; // Memory for the process available or not
+int totalMemoryUsed = 0;
+int totalFreeMemory = 100;
+int usableMemory = 100;
+
+int cpuOccupied = 0;
+
 
 
 int main(int argc, char const *argv[])
@@ -33,9 +41,17 @@ int main(int argc, char const *argv[])
 
 	FILE *file = fopen("input_data_101215842_101208175.txt", "r");
 	FILE *output = fopen("execution_101215842_101272272.txt", "w");
+	FILE *memoryOutput = fopen("memory_status_101215842_101272272.txt", "w");
+    
     fprintf(output, "+------------------------------------------------+\n");
     fprintf(output, "Time of Transition |PID | Old State | New State |\n");
     fprintf(output, "+------------------------------------------------+\n");
+
+    fprintf(memoryOutput, "+------------------------------------------------------------------------------------------+\n");
+    fprintf(memoryOutput, "|Time of Event |Memory Used |      Partitions State |Total Free Memory |Usable Free Memory |\n");
+    fprintf(memoryOutput, "+------------------------------------------------------------------------------------------+\n");
+    fprintf(memoryOutput, "|            0 |          0 |-1, -1, -1, -1, -1, -1 |              100 |               100 |\n");
+
 
 	char line[256];
 	if (file != NULL)
@@ -96,7 +112,7 @@ int main(int argc, char const *argv[])
     fclose(file);
 
     while (!allTerminated()){
-    //while (pTime < 200){
+   // while (pTime < 200){
     	process* n = PCB;
     	while (n != NULL){
     		// Add process to new queue if arrival time = system time
@@ -111,7 +127,11 @@ int main(int argc, char const *argv[])
     		// Add process to ready queue if memory available
     		// the function assignMemory() checks for memory space and returns true if memory is assigned to a process
     		if (assignMemory(r)){
+    			totalMemoryUsed += r->memorySize;
+    			totalFreeMemory -= r->memorySize;
+    			usableMemory -= getPartitionSize(r->partitionNum);
 	            fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, r->pid, "NEW", "READY");
+	            fprintf(memoryOutput, "|%13d |%11d |%22s |%17d |%18d |\n", pTime, totalMemoryUsed, memoryAsString(), totalFreeMemory, usableMemory);
 	            ready = addAtEnd(ready, r->pid, r->memorySize, r->arrivalTime, r->totalCPUTime, r->iof, r->iod, r->partitionNum, r->runTime, r->iocount, r->iorunTime);
 	            //remove process from new queue
 	            new = removeProcess(new, r);
@@ -121,26 +141,113 @@ int main(int argc, char const *argv[])
 
 
     	process* p = ready;
-    	while (p != NULL){
-
-    		// move process from ready to running
-    		if (!cpuBusy && (p->runTime < p->totalCPUTime)){
-    			running = addAtEnd(running, p->pid, p->memorySize, p->arrivalTime, p->totalCPUTime, p->iof, p->iod, p->partitionNum, p->runTime, p->iocount, p->iorunTime);
-    			fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, running->pid, "READY", "RUNNING");
-    			// remove process from ready queue
-    			ready = removeProcess(ready, p);
-
-    			// Cpu is now busy
-    			cpuBusy = true;
-    			break;
+    	if (isEP){
+    		// find largest processing time 
+    		int largestPTime = 0;
+    		while (p != NULL){
+    			if (p->totalCPUTime > largestPTime){
+    				largestPTime = p->totalCPUTime;
+    			}
+    			p = p->next;
     		}
-    		p = p->next;
+
+    		process* q = ready;
+    		while (q != NULL){
+    			if (q->totalCPUTime == largestPTime && !cpuBusy && (q->runTime < q->totalCPUTime)){
+    				running = addAtEnd(running, q->pid, q->memorySize, q->arrivalTime, q->totalCPUTime, q->iof, q->iod, q->partitionNum, q->runTime, q->iocount, q->iorunTime);
+	    			fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, running->pid, "READY", "RUNNING");
+	    			// remove process from ready queue
+	    			ready = removeProcess(ready, q);
+
+	    			// Cpu is now busy
+	    			cpuBusy = true;
+	    			break;
+    			}
+    			q = q->next;
+    		}
+
     	}
-   
+    	else{
+
+	    	while (p != NULL){
+	    		// move process from ready to running
+	    		if (!cpuBusy && (p->runTime < p->totalCPUTime)){
+	    			if (isRR){
+	    				cpuOccupied = 0;
+	    			}
+	    			running = addAtEnd(running, p->pid, p->memorySize, p->arrivalTime, p->totalCPUTime, p->iof, p->iod, p->partitionNum, p->runTime, p->iocount, p->iorunTime);
+	    			fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, running->pid, "READY", "RUNNING");
+	    			// remove process from ready queue
+	    			ready = removeProcess(ready, p);
+
+	    			// Cpu is now busy
+	    			cpuBusy = true;
+	    			break;
+	    		}
+	    		p = p->next;
+	    	}
+   		}
 
 
     	if (running != NULL){
-	    	if (running->iocount == running->iof && running->runTime < running->totalCPUTime){
+
+    		if (isRR){
+    			cpuOccupied += 1;
+    			if (running->iocount == running->iof && running->runTime < running->totalCPUTime){
+		    		running->iocount = 0;
+		    		running->iorunTime = 0;
+		    		cpuBusy = false;
+		    		// join waiting queue
+		    		fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, running->pid, "RUNNING", "WAITING");
+		    		waiting = addAtEnd(waiting, running->pid, running->memorySize, running->arrivalTime, running->totalCPUTime, running->iof, running->iod, running->partitionNum, running->runTime, running->iocount, running->iorunTime);
+			        running = NULL;
+
+		    	}
+
+		    	else if (running->runTime == running->totalCPUTime){
+		    		cpuBusy = false;
+		    		// find process in PCB and put run time to totalCpuTime
+		    		
+		    		fprintf(output, "| %16d | %2d | %9s |%9s |\n", pTime, running->pid, "RUNNING", "TERMINATED");
+		    		process* p = PCB;
+		    		while (p != NULL){
+		    			if (p->pid == running->pid){
+		    				p->runTime = p->totalCPUTime + 1;
+		    			}
+		    			p = p->next;
+		    		}
+
+		    		// free memory
+		    		for (int i = 0; i < 6; i++){
+		    			if (memory[i].pid == running->pid){
+		    				memory[i].pid = -1;
+		    				break;
+		    			}
+		    		}
+		    		totalMemoryUsed -= running->memorySize;
+	    			totalFreeMemory += running->memorySize;
+	    			usableMemory += getPartitionSize(running->partitionNum);
+
+		    		fprintf(memoryOutput, "|%13d |%11d |%22s |%17d |%18d |\n", pTime, totalMemoryUsed, memoryAsString(), totalFreeMemory, usableMemory);
+
+		    		running = NULL;
+		    	}
+		    	else if (cpuOccupied % 100 == 0 && running->runTime < running->totalCPUTime){
+		    		ready = addAtEnd(ready, running->pid, running->memorySize, running->arrivalTime, running->totalCPUTime, running->iof, running->iod, running->partitionNum, running->runTime, running->iocount, running->iorunTime);
+		    		cpuBusy = false;
+		    		fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, running->pid, "RUNNING", "READY");
+		    		running = NULL;
+		    	}
+		    	else if (running->runTime < running->totalCPUTime){
+		    		running->runTime += 1;
+		    		running->iocount += 1;
+		    	}
+		    	else{
+		    		;
+		    	}
+    		}
+    		else{
+    			if (running->iocount == running->iof && running->runTime < running->totalCPUTime){
 	    		running->iocount = 0;
 	    		running->iorunTime = 0;
 	    		cpuBusy = false;
@@ -149,36 +256,48 @@ int main(int argc, char const *argv[])
 	    		waiting = addAtEnd(waiting, running->pid, running->memorySize, running->arrivalTime, running->totalCPUTime, running->iof, running->iod, running->partitionNum, running->runTime, running->iocount, running->iorunTime);
 		        running = NULL;
 
-	    	}
-	    	else if (running->runTime == running->totalCPUTime){
-	    		cpuBusy = false;
-	    		// find process in PCB and put run time to totalCpuTime
-	    		fprintf(output, "| %16d | %2d | %9s |%9s |\n", pTime, running->pid, "RUNNING", "TERMINATED");
-	    		process* p = PCB;
-	    		while (p != NULL){
-	    			if (p->pid == running->pid){
-	    				p->runTime = p->totalCPUTime + 1;
-	    			}
-	    			p = p->next;
-	    		}
+		    	}
+		    	else if (running->runTime == running->totalCPUTime){
+		    		cpuBusy = false;
+		    		// find process in PCB and put run time to totalCpuTime
+		    		
+		    		fprintf(output, "| %16d | %2d | %9s |%9s |\n", pTime, running->pid, "RUNNING", "TERMINATED");
+		    		process* p = PCB;
+		    		while (p != NULL){
+		    			if (p->pid == running->pid){
+		    				p->runTime = p->totalCPUTime + 1;
+		    			}
+		    			p = p->next;
+		    		}
 
-	    		// free memory
-	    		for (int i = 0; i < 6; i++){
-	    			if (memory[i].pid == running->pid){
-	    				memory[i].pid = -1;
-	    				break;
-	    			}
-	    		}
-	    		running = NULL;
-	    	}
-	    	else if (running->runTime < running->totalCPUTime){
-	    		running->runTime += 1;
-	    		running->iocount += 1;
-	    	}
-	    	else{
-	    		;
-	    	}
+		    		// free memory
+		    		for (int i = 0; i < 6; i++){
+		    			if (memory[i].pid == running->pid){
+		    				memory[i].pid = -1;
+		    				break;
+		    			}
+		    		}
+		    		totalMemoryUsed -= running->memorySize;
+	    			totalFreeMemory += running->memorySize;
+	    			usableMemory += getPartitionSize(running->partitionNum);
+
+		    		fprintf(memoryOutput, "|%13d |%11d |%22s |%17d |%18d |\n", pTime, totalMemoryUsed, memoryAsString(), totalFreeMemory, usableMemory);
+
+		    		running = NULL;
+		    	}
+		    	else if (running->runTime < running->totalCPUTime){
+		    		running->runTime += 1;
+		    		running->iocount += 1;
+		    	}
+		    	else{
+		    		;
+		    	}
+    		}
     	}
+
+
+
+	    	
 
     	
     	process* w = waiting;
@@ -195,7 +314,7 @@ int main(int argc, char const *argv[])
     				ready = addAtEnd(ready, w->pid, w->memorySize, w->arrivalTime, w->totalCPUTime, w->iof, w->iod, w->partitionNum, w->runTime, w->iocount, w->iorunTime);
     				fprintf(output, "| %16d | %2d | %9s | %9s |\n", pTime, w->pid, "WAITING", "READY");
     			}
-    			waiting = removeProcess(w, waiting); 
+    			waiting = removeProcess(waiting, w); 
 
     			w = w->next;
     		}
@@ -205,18 +324,50 @@ int main(int argc, char const *argv[])
     		}
     	}
 
-    	 /*temporary - find process in pcb and increment time - used for debugging
-    		process* t = PCB;
-    		while (t != NULL){
-    			t->runTime += 1;
-    			t = t->next;
-    		}*/
+
+
+    	// print all lists at every second
+    	process* a = new;
+	    printf("New At %d: ", pTime);
+	    while (a != NULL) {
+	        printf("%d -> ", a->pid);
+	        a = a->next;
+	    }
+	    printf("NULL\n\n");
+
+	    process* b = ready;
+	    printf("Ready At %d: ", pTime);
+	    while (b != NULL) {
+	        printf("%d -> ", b->pid);
+	        b = b->next;
+	    }
+	    printf("NULL\n\n");
+
+	    process* c = waiting;
+	    printf("Waiting At %d: ", pTime);
+	    while (c != NULL) {
+	        printf("%d -> ", c->pid);
+	        c = c->next;
+	    }
+	    printf("NULL\n\n");
+
+	    process* d = running;
+	    printf("Running At %d: ", pTime);
+	    while (d != NULL) {
+	        printf("%d -> ", d->pid);
+	        d = d->next;
+	    }
+	    printf("NULL\n\n\n");
+
 
     		pTime += 1;
 }	
 
 	fprintf(output, "+------------------------------------------------+");
     fclose(output);
+
+    fprintf(memoryOutput,"+------------------------------------------------------------------------------------------+");
+    fclose(memoryOutput);
 	/* code */
 	return 0;
 }
@@ -321,4 +472,34 @@ process* addAtEnd(process* head, int pid, int memorySize, int arrivalTime, int t
     }
     current->next = newP;
     return head; // Return the unchanged head
+}
+
+char* memoryAsString(){
+	char* s = malloc(1000); 
+    if (s == NULL) {
+        printf("Memory allocation failed\n");
+        return NULL;
+    }
+    s[0] = '\0'; 
+
+    char str[12];
+    for (int i = 0; i < 6; i++) {
+        sprintf(str, "%d", memory[i].pid); 
+        strcat(s, str);
+
+        if (i < 5) {
+            strcat(s, ", ");
+        }
+    }
+
+    return s; // Return the dynamically allocated string;
+}
+
+int getPartitionSize(int partitionNum){
+	for (int i = 0; i < 6; i++){
+		if (memory[i].pNum == partitionNum){
+			return memory[i].size;
+		}
+	}
+	return 0;
 }
