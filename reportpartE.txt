@@ -1,0 +1,29 @@
+Single Semaphore Usage:
+
+I replaced the multiple semaphores with a one single  semaphore that controls whats goes into the critical section where the TAs access the shared index  records of students. This ensures that only one TA can access the critical section at a time, simplifying the synchronization process.
+
+Avoiding Deadlock:
+
+By using just one semaphore and eliminating the need to acquire multiple semaphores, I removed the conditions that can lead to deadlock, such as circular wait and hold-and-wait situations. Since TAs aren't holding one resource while waiting for another, the chance of deadlock is significantly reduced.
+
+Avoiding Livelock:
+
+TAs now use blocking semaphore operations, meaning they wait their turn to enter the critical section without repeatedly trying and failing to acquire semaphores. This prevents livelock scenarios where TAs might be active but not making any real progress.
+
+Why the Program is Deadlock-Free and Livelock-Free:
+
+Deadlock Free:
+
+With only one semaphore controlling access, there's no possibility of circular wait because TAs aren't waiting on multiple resources. The hold-and-wait condition is eliminated since TAs don't hold any resources while waiting for others.
+
+Livelock Free:
+
+Since TAs perform blocking waits on the semaphore, they don't continuously attempt and fail to acquire it. The operating system manages the semaphore queue, ensuring that each TA gets a fair chance to proceed, which helps prevent starvation and livelock.
+
+My Execution Results:
+
+I ran the modified program several times, and in each run, all TAs were able to mark students without any deadlock or livelock occurring. The TAs printed their actions to the screen, and the final marks for all students were displayed correctly.
+
+Note on Deadlock Possibility:
+
+While using a single semaphore should prevent deadlock, but  deadlock could still theoretically occur just the probability is just very low. In this implementation, because TAs aren't holding onto resources while waiting and there's only one semaphore involved, deadlock shouldn't happen. However,its possible it could happen if it was maybe a bit more complex
