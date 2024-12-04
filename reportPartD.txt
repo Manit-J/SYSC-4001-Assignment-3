@@ -1,0 +1,20 @@
+what could cause Deadlock or Livelock in the Program
+
+In Part 2.c, the way semaphores are used could potentially lead to deadlock or livelock situations.
+
+Conditions Leading to Deadlock:
+
+Circular Wait: If each TA process holds a semaphore that the next TA needs, forming a circle, they could end up waiting indefinitely for each other.
+processes Holding  and Waiting: A TA holds one semaphore while waiting to acquire another, which could prevent others from proceeding.
+Conditions Leading to Livelock:
+
+Repeated Semaphore Acquisition Failures: If TAs continuously try to acquire semaphores, fail, release them, and retry without making progress, they might enter a livelock where they're active but really not progressing kind of becomems a boundewaiting.
+Observing Deadlock or Livelock
+
+In my case, I didn't see any deadlock or livelock when I ran the program. This might be due to the timing and order in which the processes acquired semaphores. The random delays and the way the operating system schedules processes could have prevented the specific conditions required for deadlock.
+
+Execution Order and Process Behavior
+
+No Deadlock Occurred: The TAs might have acquired semaphores in an order that didn't lead to a circular wait. Since they didn't hold onto semaphores while waiting for others, they avoided the hold-and-wait condition.
+
+Random Delays: The random delays introduced in the program might have helped avoid deadlock by changing the timing of semaphore acquisition. This randomness can disrupt the specific sequence of events that would lead to deadlock or livelock.
