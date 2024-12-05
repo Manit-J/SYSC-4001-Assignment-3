@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Define file names
+PROGRAM="Part2_E_101208175_101215842"
+DATABASE="student_database.txt"
+
+# Ensure the student database file exists
+if [ ! -f "$DATABASE" ]; then
+    echo "Error: '$DATABASE' not found. Please make sure the student database file exists."
+    exit 1
+fi
+
+# Compile the program
+echo "Compiling $PROGRAM.c..."
+gcc -o $PROGRAM $PROGRAM.c -lrt -lpthread
+if [ $? -ne 0 ]; then
+    echo "Compilation failed. Please check your code."
+    exit 1
+fi
+echo "Compilation successful."
+
+# Run the program
+echo "Running the program..."
+./$PROGRAM
+if [ $? -ne 0 ]; then
+    echo "Program encountered an error during execution."
+    exit 1
+fi
+
+echo "Program finished successfully."
+
