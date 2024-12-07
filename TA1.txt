@@ -1,0 +1,16 @@
+Student 1035: 9
+Student 1003: 5
+Student 1024: 0
+Student 1012: 4
+Student 1027: 7
+Student 1031: 0
+Student 9999: 4
+Student 1068: 0
+Student 1029: 5
+Student 1026: 5
+Student 1005: 7
+Student 1060: 0
+Student 1046: 1
+Student 1073: 2
+Student 1066: 2
+Student 1076: 7

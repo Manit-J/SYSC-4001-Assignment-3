@@ -1,0 +1,16 @@
+Student 1002: 9
+Student 1049: 5
+Student 1019: 0
+Student 1013: 4
+Student 1059: 7
+Student 1007: 0
+Student 1042: 4
+Student 1041: 0
+Student 1056: 5
+Student 1045: 5
+Student 1033: 7
+Student 1044: 0
+Student 1022: 1
+Student 1004: 2
+Student 1063: 2
+Student 1071: 7

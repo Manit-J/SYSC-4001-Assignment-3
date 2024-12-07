@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Set the script to exit on any error
+set -e
+
+# Compilation
+echo "Compiling marking_system.c..."
+gcc -o Part2_A_101208175_101215842 Part2_A_101208175_101215842.c -lpthread
+
+# Check if the student database file exists
+if [ ! -f student_database.txt ]; then
+  echo "Error: student_database.txt not found!"
+  exit 1
+fi
+
+# Run the program
+echo "Running the marking system program..."
+./marking_system
+
+# Check if the output files exist
+echo "Checking TA output files..."
+for i in {1..5}; do
+  if [ -f "TA${i}.txt" ]; then
+    echo "TA${i}.txt exists."
+  else
+    echo "Warning: TA${i}.txt not found."
+  fi
+done
+
+echo "Program execution completed."
+
